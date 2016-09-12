@@ -2,7 +2,6 @@ package com.azavea.geowave
 
 import com.azavea.common._
 
-import mil.nga.giat.geowave.adapter.vector.FeatureDataAdapter
 import mil.nga.giat.geowave.core.geotime.index.dimension._
 import mil.nga.giat.geowave.core.geotime.index.dimension.TemporalBinningStrategy.{ Unit => BinUnit }
 import mil.nga.giat.geowave.core.geotime.ingest._
@@ -13,6 +12,17 @@ import mil.nga.giat.geowave.core.index.sfc.tiered.TieredSFCIndexFactory
 import mil.nga.giat.geowave.core.store.DataStore
 import mil.nga.giat.geowave.core.store.index.PrimaryIndex
 import mil.nga.giat.geowave.core.store.index.writer.IndexWriter
+import mil.nga.giat.geowave.adapter.vector._
+import mil.nga.giat.geowave.core.store.index._
+import mil.nga.giat.geowave.datastore.accumulo._
+import mil.nga.giat.geowave.datastore.accumulo.index.secondary._
+import mil.nga.giat.geowave.datastore.accumulo.metadata._
+import mil.nga.giat.geowave.datastore.accumulo.operations.config.AccumuloOptions
+import mil.nga.giat.geowave.core.store.index.writer.IndexWriter
+import org.apache.spark.{SparkConf, SparkContext}
+import org.geotools.data.{DataStoreFinder, FeatureSource}
+import org.geotools.data.simple.SimpleFeatureStore
+import org.geotools.feature.FeatureCollection
 import mil.nga.giat.geowave.datastore.accumulo._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.opengis.feature.simple.SimpleFeature
@@ -23,7 +33,7 @@ object WavePoke extends CommonPoke {
   def main(args: Array[String]): Unit = {
 
     if (args.length < 7) {
-      println(s"arguments: <instance> <zookeepers> <user> <password> <gwNamespace> <indexType> <instruction\{1,\}>")
+      println(s"arguments: <instance> <zookeepers> <user> <password> <gwNamespace> <indexType> <instruction(s)>")
       System.exit(-1)
     }
 
