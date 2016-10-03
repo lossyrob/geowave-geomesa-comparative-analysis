@@ -294,25 +294,24 @@ strategy is used with four partitions. For analogous use cases, we recommend usi
 
 ## Conclusions
 
-Our comparative analysis between the GeoWave and GeoMesa projects concluded that both are well constructed projects for
+Our comparative analysis between GeoWave and GeoMesa concluded that both are well constructed projects for
 dealing with big geospatial data. Both projects should be considered when a big geospatial data solution is required.
-We hope this document allows potential users to make the best choice when deciding what projects to use.
+We hope this document allows potential users to make the best choice when deciding what project to use.
 
-If you need to use one of the projects for a use case that includes many queries being executed against the system at
-once, we would recommend GeoWave. The performance issues we were seeing with GeoMesa in this use case were significant.
-To be fair, we did not give the GeoMesa team a lot of time to respond to the issues, as the multitenancy tests were
-one of the last sets of test we ran before this final report. More work will have to go into diagnosing the issues,
-and perhaps the issues GeoMesa faces in multitenancy situations are easy to overcome. However, according to our experiences,
-we would recommend GeoWave for these use cases.
+If your use case includes a heavy and highly concurrent query load we would recommend GeoWave.
+The performance issues we encountered with GeoMesa in this use case were significant.
+As a qualification, multitenancy tests were the last sets of test we ran for this report, and GeoMesa team had limited time to respond to the issues.
+It is unclear if these issues can be remediated via configuration or are fundamental. More work will have to go into diagnosing the them.
+However, according to our experiences, we would recommend GeoWave for these use cases.
 
 We also made the conclusion that GeoMesa is a more mature open source project than GeoWave. The difference is not vast,
 but it is noticable enough to put into this report. For new users that want to get up and running with a solution quickly,
-where both projects would satisfy the needs of the user, it is our recommendation to begin with GeoMesa. This is
+where both projects would satisfy the needs of the user, it is our recommendation to use GeoMesa. This is
 because the documentation is more clear, and we experienced many fewer problems getting started with GeoMesa as compared
-to GeoWave. We also feel the API is more simple to use for people new to the project. There is a large caveat to that point,
-however: the Azavea team is mostly Scala developers; GeoMesa is written in Scala, and GeoWave is written in Java. This could
-cause a bias in our opinion of the API complexity. However, even taking that into account, we still believe GeoMesa to be
-easier to work with. This opinion however should not be seen as a discredit to the GeoWave team; they have been incredibly
+to GeoWave. We also feel the API is simpler to use for people new to the project. There is a large caveat to that point,
+however: the Azavea team is mostly Scala developers. GeoMesa is written in Scala, and GeoWave is written in Java. This could
+cause a bias in our opinion of the API complexity. Even taking that into account, we still believe GeoMesa to be
+easier to work with. This opinion should not be seen as a discredit to the GeoWave team. They have been incredibly
 responsive to any of our questions, and have created an advanced and useful project that I would recommend for many use cases.
 It also makes sense when viewed in the history of the projects in the open source: GeoWave was open sourced after GeoMesa,
 and while GeoWave has not yet started LocationTech incubation, GeoMesa has graduated as a full-fledged LocationTech project.
@@ -323,7 +322,7 @@ One important take-away from this experience is that the GeoMesa and GeoWave pro
 they both exist as umbrellas under which a number of technologies exist. For instance, a Kafka Datastore is part of
 GeoMesa, but there is no reason that users of GeoWave could not take advantage of that part of GeoMesa. In fact, you can
 install GeoMesa and GeoWave iterators on the same Accumulo cluster, and save certain data in GeoMesa tables while saving other data in
-GeoWave tables. These technologies are not incompatible, and I urge potential users of the software to not consider this
+GeoWave tables. These technologies are not incompatible, and we urge potential users of the software to not consider this
 an "either/or" decision, and instead to look into what useful portions each project contains. This also highlights the importance
 of the two projects collaborating; the more collaboration that exists between the two projects, the easier it will be for users to
 pick out the features and technologies from either projects that help solve their big geospatial data problems.
@@ -331,7 +330,7 @@ pick out the features and technologies from either projects that help solve thei
 ### Recommendations for Collaboration
 
 Our recommendation for how the two projects can collaborate in the future is to create external, collaboratively developed projects.
-One or more separate projects could be created that would contain common code, so that GeoWave and GeoMesa could depend
+One or more separate projects could be created to contain common code, so that GeoWave and GeoMesa could depend
 on these external  projects and collaboratively develop the common functionality together.
 For functionality that is common between the projects, the developers of the GeoMesa and GeoWave projects could
 code those features once and reuse each other's code.
@@ -340,39 +339,39 @@ However, the ideal of having common external libraries, collaboratively develope
 to turn into a reality for a number of reasons.
 Developing these external projects from existing overlapping functionality would be difficult
 because existing functionality would have to be extracted and generalized in order to put into the common project.
-In some cases, this would be untenable; for instance, though both project develop Accumulo Iterators, there exists a number of optimizations
-that are specific to each framework, and generalization would actually decrease peformance of the frameworks.
+In some cases, this would be untenable; for instance, though both projects develop Accumulo Iterators, there exists a number of optimizations
+that are specific to each framework, and generalization would actually decrease performance of the frameworks.
 
-There are existing features which would require much less effort to place into a common project, however.
+There are existing features which would require much less effort to place into a common project.
 For instance, the GeoMesa Kafka DataStore has minimal requirements on GeoMesa-specific code, and transferring
 that feature from the GeoMesa codebase into a common codebase would be much less difficult.
 
 Another difficulty in creating a common codebase lies in the fact that you would have two separate teams
 of developers, who are used to programming in different languages under different architectures, now working
 on the same codebase. Which language does that codebase choose, Java or Scala? What architecture and design
-principals does it inheret?
+principals does it inherit?
 
 These difficulties are not insurmountable. For instance, the GeoTrellis, GeoMesa and GeoWave projects
 collaborated on the initial development of the LocationTech project SFCurve, for dealing with space filling curve
 indexing. GeoMesa currently depends on that project, and it is on GeoTrellis's roadmap to depend on the project.
 This will mark an example of two projects in the big geospatial data community relying on a collaboratively developed
-external project. The fact that GeoTrellis, GeoMesa and SFCurve are all developed in Scala, however, makes that
+external project. GeoTrellis, GeoMesa, and SFCurve are all developed in Scala which makes the
 situation not completely analogous to a collaborative external project between GeoMesa and GeoWave.
 
 There are two key areas where we would suggest collaboration:
 
 ##### Ingest tooling
 
-GeoMesa's ingest tooling includes several converters that convert data from formats such as CSV, JSON and XML to GeoTools SimpleFeatures.
+GeoMesa's ingest tooling includes several data converters from formats such as CSV, JSON, and XML to GeoTools SimpleFeatures.
 These converters are configurable through a JSON-like configuration file. Because the tooling converts data to a GeoTools SimpleFeature,
 which both projects work with, either project could benefit from this feature. The GeoWave developers have expressed interest
 in an external project that would support this type of ingest tooling for ingesting into both GeoMesa and GeoWave,
 and it seems like a good point of collaboration.
 
-Also, as part of this comparative analysis's performance testing, the Azavea team created
+Also, as part of this comparative analysis' performance testing, the Azavea team created
 ingest tools that are based on Apache Spark, which use common code between the GeoMesa and GeoWave ingests.
 This already exists as an external codebase which is demonstratively useful for ingesting
-large datasets in both GeoMesa and GeoWave. This codebase is available for use and could
+large datasets in both GeoMesa and GeoWave. The codebase is available for use and could
 serve as a starting point for collaborative ingest tooling.
 
 ##### Common SimpleFeature serialization
@@ -382,13 +381,11 @@ and Kryo serialization libraries to serialize SimpleFeatures. If both
 projects were to rely on an external project to serialize and deserialize
 SimpleFeatures, data would much more simply be exchanged through the different systems.
 
-For instance, if GeoWave were to export data as set of avro files, those avro
+For instance, if GeoWave were to export data as a set of Avro files, those Avro
 files would be able to be read into SimpleFeatures and ingested into GeoMesa.
 In fact, because the serialization logic would be the same between projects,
-an Accumulo table that is indexed by GeoMesa could be moved to
-a table that is indexed by GeoWave by simply changing
-the Accumulo entry Keys, leaving the Values (the serialized SimpleFeatures)
-unchanged.
+an Accumulo table indexed by GeoMesa could be moved to
+a table indexed by GeoWave by changing the Accumulo entry keys, leaving the values (the serialized SimpleFeatures) unchanged.
 
 Serialization of SimpleFeatures is most likely of interest to the community
 even outside of these two projects. If the projects and the community  were to standardize on specific
