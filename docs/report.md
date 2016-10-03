@@ -4,32 +4,32 @@
 
 > This document details the results of a comparative analysis between two open source geospatial big data frameworks: GeoWave and GeoMesa.
 > A feature comparison and a set of performance tests with analysis are presented.
-> We conclude that although there is a large set of overlapping features, most specifically around indexing
+> We have concluded that despite a large set of overlapping features, most specifically around indexing
 > and querying spatial and spatiotemporal data in Accumulo, the projects should not be considered
 > the same. Through analyzing performance test data, we make three conclusions about the performance characteristics
 > of the current versions of the systems (GeoMesa 1.2.6 and GeoWave 0.9.3) for use case of indexing spatial and spatiotemporal data in Accumulo:
 > 1. GeoMesa performed better against queries with large result counts while GeoWave performed better
 > on smaller result sets; 2. GeoWave performed better against queries with larger temporal bounds, while
 > GeoMesa performed better when the temporal bounds were smaller (around a couple of weeks or less);
-> and 3. that GeoWave outperforms GeoMesa in multitenancy use cases, where there are 16 to 32 queries being
-> executed against the system in parallel. We also find that the two systems perform reasonably well
-> in all cases, and that neither system was dominant in performance characteristics. We provide recommendations
-> for was the two projects can collaborate moving forward in light of this analysis.
+> and 3. GeoWave outperforms GeoMesa in multitenancy use cases, where there are 16 to 32 queries being
+> executed against the system in parallel. We also find the two systems perform reasonably well
+> in all cases, and neither system was dominant in performance characteristics. We provide recommendations
+> for ways the two projects can collaborate moving forward in light of this analysis.
 
 ## Introduction
 
 GeoMesa and GeoWave are two open source projects that deal with large geospatial data.
-These projects at a high level have solutiongs to  many of the same types of problems.
+At a high level these projects have solutions to many of the same types of problems.
 Because of this overlap, it has been difficult for new users approaching the big geospatial data community to understand what
 the differences are between these projects and what project should be used in what circumstances.
 For some of their most overlapping functionality, for example indexing spatial and spatiotemporal data in Accumulo, the differences
 between the two projects can be unclear to even veterans of big geospatial data processing.
-This lack of clarity is a problem that this document aims to address.
+This lack of clarity is a problem this document aims to address.
 
-In Summer of 2016, Azavea conducted a comparative analysis of GeoWave and GeoMesa in order to gain a deeper understanding of the GeoWave and GeoMesa projects as compared to each other,
-and in order to share that understanding with the big geospatial data community.
-This document contains the results of our efforts and aims to provide a more clear picture of how the projects are different from each other and what use cases fit better to either project,
-so that the big geospatial data community can a deeper understanding of these two outstanding projects and better utilize their functionality.
+In the summer of 2016, Azavea conducted a comparative analysis of GeoWave and GeoMesa in order to gain a deeper understanding of the GeoWave and GeoMesa projects as compared to each other,
+and to share that understanding with the big geospatial data community.
+This document contains the results of our efforts and aims to provide a more clear picture of how the projects are different from each other and what use cases fit best to either project.
+We hope this aids the big geospatial data community in gaining a deeper understanding of these two outstanding projects and allows better utilization of their functionality.
 
 Along with an understanding how the projects are different from each other, this comparative anaysis aims to provide information
 and guidance to potential future collaboration efforts between the GeoWave and GeoMesa projects.
@@ -38,24 +38,24 @@ This document assumes prior knowledge about what the GeoMesa and GeoWave project
 - GeoWave: http://ngageoint.github.io/geowave/
 - GeoMesa: http://www.geomesa.org/
 
-## Feature Comparision
+## Feature Comparison
 
 GeoMesa and GeoWave are projects that contain many features, and not all of them overlap.
-The Venn Diagram below is not a complete list of features, but indicates the significant overlap of the core features of GeoWave and GeoMesa and some of the distinguishing features.
+The Venn diagram below is not a complete list of features, but indicates the significant overlap of the core features of GeoWave and GeoMesa and some of the distinguishing features.
 
 ![Venn Diagram of features](img/venn-diagram.png)
 
-As is illistrated in the diagram, there is a major overlap when it comes to a core feature of the two projects, namely using space filling curves to index geospatial data in Accumulo. However, there are many features that differentiate the projects from one another. Below we describe some major differences. A more detailed list of features can be found in _Appendix A: Details of GeoMesa and GeoWave features_.
+As is illustrated in the diagram, there is a major overlap when it comes to a core feature of the two projects, namely using space filling curves to index geospatial data in Accumulo. However, there are many features that differentiate the projects from one another. Below we describe some major differences. A more detailed list of features can be found in _Appendix A: Details of GeoMesa and GeoWave features_.
 
 ### Generality of the Architecture
 
-A major difference between the projects is the generality of the architectures when it comes to supporting various backends and indexing strategies. GeoWave has a focus on being an N-Dimensional indexing mechanism for arbitrary backends; the fact that we are focusing on it's ability to handle geospatial data is only based on the current use cases that we know GeoWave is used for. However, the project aims at supporting data with arbitrary dimensionality. GeoMesa focuses specifically on 2-Dimensional spatial and 3-Dimensional spatiotemporal data.
+A major difference between the projects is the generality of the architectures when it comes to supporting various backends and indexing strategies. GeoWave has a focus on being an N-Dimensional indexing mechanism for arbitrary backends. The fact we are focusing on its ability to handle geospatial data is only based on the currently known GeoWave use cases. However, the project aims at supporting data with arbitrary dimensionality. GeoMesa focuses specifically on 2-Dimensional spatial and 3-Dimensional spatiotemporal data.
 
-GeoWave specifically is designed around abstractions that remain agnostic about the storage and access implementations. This could provide more flexibility for developing backend support, which might explain that their HBase support is more mature than GeoMesa's. GeoMesa focuses on using GeoTool's abstractions, and so is more dependant on GeoTools as a base library. It also focuses less on dealing with abstractions; this may have an effect that features written for one backend might be difficult to translate to another backend. However, dealing with less abstraction can be more straightforward, and some developers may find dealing with the less-abstracted GeoMesa API to be easier to understand and work with.
+GeoWave specifically is designed around abstractions that remain agnostic about the storage and access implementations. This could provide more flexibility for developing backend support, which might explain why GeoWave HBase support is more mature than GeoMesa's. GeoMesa focuses on using GeoTools' abstractions, and thus is more dependent on GeoTools as a base library. GeoMesa also focuses less on dealing with abstractions; this may have an effect that features written for one backend might be difficult to translate to another backend. However, dealing with less abstraction can be more straightforward, and some developers may find it easier to understand and work with the GeoMesa API.
 
 ### Language
 
-GeoMesa is developed using Scala, and GeoWave is developed using Java. Both Scala and Java are languages where the source compile down to Java Virtual Machine (JVM) byte code, and execute on top of the same JVM. This means that both projects can use the same dependencies, as can be observed by both project's reliance on GeoTools for some of it's features, including a core data type: the GeoTools SimpleFeature. However, the differences between the Scala and Java languages are many, and it remains one of the biggest differences between the project. Scala developers (such as the team conducting this comparative analysis) may find the GeoMesa API easier to work with, since it is written in a language they are familiar with. Java programmers, on the other hand, might feel more at home with GeoWave. GeoMesa, though written in Scala, implements a GeoTools interface that should allow Java developers to easily use GeoMesa functionality without having to write Scala; however if a developer wants to read the codebase or use the GeoMesa types directly, they might have trouble if they are not familiar with the Scala language.
+GeoMesa is developed using Scala, and GeoWave is developed using Java. Both Scala and Java are languages where the source compiles down to Java Virtual Machine (JVM) byte code, and execute on top of the same JVM. This means that both projects can use the same dependencies, as can be observed by both project's reliance on GeoTools for some of its features, including a core data type: the GeoTools SimpleFeature. However, the differences between the Scala and Java languages are many, and it remains one of the biggest differences between the projects. Scala developers (such as the team conducting this comparative analysis) may find the GeoMesa API easier to work with, since it is written in a language with which they are familiar. Java programmers, on the other hand, might feel more at home with GeoWave. GeoMesa, though written in Scala, implements a GeoTools interface that should allow Java developers to easily use GeoMesa functionality without having to write Scala. However, if a developer wants to read the codebase or use the GeoMesa types directly, they might have trouble if they are not familiar with the Scala language.
 
 ### Accumulo Indexing
 
@@ -63,18 +63,18 @@ The two projects approach indexing in Accumulo in a similar way, but there are s
 
 #### Choice of Space Filling Curve
 
-GeoMesa supports space filling curve indexes named Z-order and XZ indexes, while GeoWave supports Hilbert curves. These different space filling curve implementations have different properties that affect performance, such as the number of false-positives returned and number of duplicate entries to be indexed. You can read more about these differences in performance characteristics in _Appendix F: Details of Performance Test Conclusions_.
+GeoMesa supports space filling curve indexes named Z-order and XZ indexes, while GeoWave supports Hilbert curves. These different space filling curve implementations have different properties that affect performance, such as the number of false positives returned and number of duplicate entries to be indexed. You can read more about these differences in performance characteristics in _Appendix F: Details of Performance Test Conclusions_.
 
 #### Sharding
 
-By default, GeoMesa uses "sharding", which is the technique of prefixing indexes with a discrete number of shard IDs in order to better distribute the data across nodes of a cluster. There is a tradeoff between increasing distribution while decreasing locality, which has an affect on performance. GeoWave has the ability to shard, although in GeoWave it's called partitioning the data. You can create a compound index with any of the GeoWave indexing strategies in order to partition. Unlike GeoMesa, GeoWave partitioning is not on by default. It is also configurable: you can decide on the number of partitions (i.e. shards) that you want, and determine whether or not it's a round robin or hashing strategy that determines the partition ID. GeoMesa's sharding seems to only use a hashing algorithm and a non-configurable number of shards.
+By default, GeoMesa uses "sharding", a technique of prefixing indexes with a discrete number of shard IDs in order to better distribute the data across nodes of a cluster. There is a trade-off between increasing distribution while decreasing locality, which has an effect on performance. GeoWave has the ability to shard, although in GeoWave it's called partitioning the data. You can create a compound index with any of the GeoWave indexing strategies in order to partition. Unlike GeoMesa, GeoWave partitioning is not on by default. It is also configurable: you can decide on the number of partitions (i.e. shards) you want, and determine whether or not it's a round robin or hashing strategy that determines the partition ID. GeoMesa's sharding seems to only use a hashing algorithm and a non-configurable number of shards.
 
 #### Periodicity
 
 To get around the problem of unbounded dimensions, such as time, the concept of "periodicity" is used in both GeoMesa and GeoWave.
 This feature is similar to a shard, in that it prefixes an index. A simple way to think of periodicity is that you are binning each
-space filling curve into one period, for example, for each week.
-In GeoWave, you can configure any dimension to have a periodicity, and a configurable length.
+space filling curve into one period, for example, for one week.
+In GeoWave, you can configure any dimension to have a periodicity of a configurable length.
 You can also configure the periodicity of the time dimension to day, week, month, or year.
 
 #### Tiered indexing vs XZ index
@@ -83,7 +83,7 @@ GeoMesa uses an XZ index to handle non-point data, which allows the data to be s
 based on the the size of the geometry. GeoWave uses a technique called tiered indexing to handle this issue. The technical differences
 between the two approaches are beyond the scope of this document; however it's important to note the difference in approach
 because of the performance implications. One major difference between the two approaches is that the XZ approach does not store
-any duplicates of data, while the Tiered strategy can store up to four copies of an entry.
+any duplicates of data, while the tiered strategy can store up to four copies of an entry.
 
 ### Other features
 
@@ -93,22 +93,22 @@ This section gives a summary of features that are either found in one project an
 
 - Integration with Mapnik
 - Integration with PDAL for reading and writing point cloud data from/to GeoWave
-- Time interval queries: The ability to index data that exists within an interval of time, and query for intersecting intervals
+- Time interval queries: The ability to index data that exists within an interval of time and query for intersecting intervals
 - Pixel-level subsampling: A visualization performance optimization that only returns data based on pixel width
 - DBScan clustering
 
 #### Features Found in GeoMesa and not in GeoWave
 
-- Tube selection analysis: given a collection of points (with associated times), you should be able to return similar collections of points (in terms of where the lines connecting said points exist).
+- Tube selection analysis: Given a collection of points (with associated times), you should be able to return similar collections of points (in terms of where the lines connecting said points exist)
 - Loose bounding box queries
 - JSON configurable ingest tooling
 - Cassandra backend (alpha support)
 - Google BigTable support (marked experimental)
 - Kafka GeoTools DataStore
 - Cost-based query optimization
-- Querying for a subset of SimpleFeature attributes, and only returning the necessary data
+- Querying for a subset of SimpleFeature attributes and only returning the necessary data
 
-##### Raster support
+##### Raster Support
 
 Both projects have some level of raster support; however, GeoWave's raster support appears to be more mature than GeoMesa's.
 According to GeoMesa's documentation, rasters must be pre-tiled to a a specific size, projection,
@@ -118,7 +118,7 @@ rasters that are not pre-tiled. While GeoWave's raster support is more mature th
 both project's support of raster data is not entirely mature; for instance, there is no support for anything but
 spatial rasters (i.e. you cannot ingest spatiotemporal raster data such as timestamped imagery).
 
-##### HBase backend
+##### HBase Backend
 
 Both projects have support for an HBase backend; however, GeoWave's support for HBase is more mature.
 The GeoWave development team has expressed the amount of work that has gone into trying to match
@@ -132,8 +132,8 @@ Accumulo and HBase backends.
 
 In this section, we briefly describe the technical means by which we were able to test the relative performance of GeoWave and GeoMesa for indexing SimpleFeatures in Accumulo.
 
-The ultimate aim of the method of deployment, ingesting and running the tests was to ensure that results were both repeatable and quick to iterate on.
-This implies that these methods, and the associated software, are useful beyond the needs of this comparative analysis. All software associated
+The ultimate aim of the method of deployment, ingesting, and running the tests was to ensure results were both repeatable and could be iterated on quickly.
+This implies these methods and the associated software are useful beyond the needs of this comparative analysis. All software associated
 with the performance tests is open sourced under the Apache 2.0 license, and can be found at https://github.com/azavea/geowave-geomesa-comparative-analysis
 
 #### Environment
