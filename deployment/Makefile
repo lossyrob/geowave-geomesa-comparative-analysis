@@ -1,5 +1,5 @@
 # No spaces in STACK_NAME
-export STACK_NAME := ${USER}
+export STACK_NAME := ${USER}_GDELT
 export EC2_KEY := geotrellis-cluster
 export EC2_KEY_FILE := "${HOME}/${EC2_KEY}.pem"
 export AWS_DEFAULT_REGION := us-east-1
@@ -8,7 +8,13 @@ export SUBNET_ID := subnet-c5fefdb1
 
 export MASTER_INSTANCE := m3.xlarge
 export MASTER_PRICE := 0.5
+
+# export WORKER_INSTANCE := m3.xlarge
+# export CPUS_PER_WORKER := 4
+
 export WORKER_INSTANCE := m3.2xlarge
+export CPUS_PER_WORKER := 8
+
 export WORKER_PRICE := 0.5
 export WORKER_COUNT := 5
 
@@ -19,7 +25,7 @@ export EXECUTOR_CORES := 2
 export YARN_OVERHEAD := 700
 
 # Docker image of benchmarking service
-export SERVICE_TAG := rob21
+export SERVICE_TAG := rob40
 export SERVICE_IMG := quay.io/geotrellis/comparative-analysis-query-server:${SERVICE_TAG}
 
 SPARK_PARAMS := --driver-memory ${DRIVER_MEMORY} \
@@ -29,7 +35,6 @@ SPARK_PARAMS := --driver-memory ${DRIVER_MEMORY} \
 --conf spark.dynamicAllocation.enabled=true \
 --conf spark.yarn.executor.memoryOverhead=${YARN_OVERHEAD} \
 --conf spark.yarn.driver.memoryOverhead=${YARN_OVERHEAD}
-
 
 SPARK_OPTIONS := --master yarn \
 --deploy-mode cluster ${SPARK_PARAMS}
@@ -68,6 +73,8 @@ ${STACK_NAME}-geomesa-cluster-id.txt:
 ${STACK_NAME}-geowave-cluster-id.txt:
 	$(call EMR_CREATE_CLUSTER,geowave,quay.io/geodocker/accumulo-geowave)
 
+rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
+
 deploy: ${STACK_NAME}-geomesa-cluster-id.txt ${STACK_NAME}-geowave-cluster-id.txt
 	terraform apply \
 -state="${STACK_NAME}.tfstate" \
@@ -93,9 +100,9 @@ destroy-service:
 -var 'geowave_cluster_id=NA'
 
 
-destroy: destroy-service
+destroy: save-metrics  destroy-service
 	aws emr terminate-clusters --cluster-ids ${GEOMESA_CLUSTER_ID} ${GEOWAVE_CLUSTER_ID}
-	@rm -f *-cluster-id.txt
+	@rm -f ${STACK_NAME}*-cluster-id.txt
 
 ingest-synthetic-data-gm: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../synthetic-data mesaPoke ${S3_URI}/jars)
 ingest-synthetic-data-gm:
@@ -124,7 +131,10 @@ csv -i gis -z ${GEOMESA_ZOOKEEPER} -u root \
 --featurename gmtrajectory \
 geotrellis-sample-datasets geolife/
 
+# --numPartitions ${NUMPARTITIONS} --partitionStrategy HASH
+# --numSplits ${NUMPARTITIONS}
 ingest-geolife-gw: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-geolife-gw: NUMPARTITIONS=$(shell expr ${WORKER_COUNT} \* ${CPUS_PER_WORKER})
 ingest-geolife-gw:
 	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
 	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest CSV" \
@@ -136,33 +146,123 @@ csv -i gis -z ${GEOWAVE_ZOOKEEPER} -u root \
 --featurename gwtrajectory \
 geotrellis-sample-datasets geolife/
 
-ingest-shp-data-gm: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
-ingest-shp-data-gm:
-	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
-	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest shapefiles" \
-spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  ${ASSEMBLY_URI} \
+ingest-generated-tracks-gm: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
+ingest-generated-tracks-gm:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest Generated Tracks" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  $${ASSEMBLY_URI} \
+avro -i gis -z ${GEOMESA_ZOOKEEPER} -u root \
+-p secret -t geomesa.tracks --inputPartitionSize 1 \
+--featurename generated-tracks \
+geotrellis-sample-datasets generated-tracks/
+
+ingest-generated-tracks-gw: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-generated-tracks-gw:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest Generated Tracks" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geowave.Main  $${ASSEMBLY_URI} \
+avro -i gis -z ${GEOWAVE_ZOOKEEPER} -u root \
+-p secret -t geowave.tracks \
+--featurename generated-tracks --temporal --inputPartitionSize 1 \
+geotrellis-sample-datasets generated-tracks/
+
+ingest-vienna-gm: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
+ingest-vienna-gm:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest Vienna" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  $${ASSEMBLY_URI} \
 shapefile -i gis -z ${GEOMESA_ZOOKEEPER} -u root \
--p secret -t geomesa.shptest \
---featurename gmgenerated-tracks \
-geotrellis-sample-datasets generated-tracks/
+-p secret -t geomesa.shptest --featurename vienna-buildings geotrellis-sample-datasets Vienna/buildings/
 
-ingest-shp-data-gw: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
-ingest-shp-data-gw:
-	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
-	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest shapefiles" \
-spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  ${ASSEMBLY_URI} \
+ingest-vienna-gw: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-vienna-gw:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest Vienna" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geowave.Main  $${ASSEMBLY_URI} \
 shapefile -i gis -z ${GEOWAVE_ZOOKEEPER} -u root \
--p secret -t geowave.shptest \
---featurename gmgenerated-tracks \
+-p secret -t geowave.shptest --featurename vienna-buildings geotrellis-sample-datasets Vienna/buildings/
+
+ingest-vienna-translate-gm: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
+ingest-vienna-translate-gm:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest Vienna Translated" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  $${ASSEMBLY_URI} \
+shapefile -i gis -z ${GEOMESA_ZOOKEEPER} -u root \
+-p secret -t geomesa.transvienna --featurename vienna-buildings \
+--translationPoints s3://geotrellis-test/ca/ingest/city-points.json --translationOrigin "16.36,48.21" \
+geotrellis-sample-datasets Vienna/buildings/
+
+
+ingest-vienna-translate-gw: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-vienna-translate-gw:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest Vienna Translated" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geowave.Main  $${ASSEMBLY_URI} \
+shapefile -i gis -z ${GEOWAVE_ZOOKEEPER} -u root \
+-p secret -t geowave.transvienna --featurename vienna-buildings \
+--translationPoints s3://geotrellis-test/ca/ingest/city-points.json --translationOrigin "16.36,48.21" \
+geotrellis-sample-datasets Vienna/buildings/
+
+ingest-vienna-translate: ingest-vienna-translate-gw ingest-vienna-translate-gm
+
+ingest-tracks-translate-gm: export ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
+ingest-tracks-translate-gm:
+	@if [ -z "$${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest Generated Tracks Translation" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.Main  $${ASSEMBLY_URI} \
+avro -i gis -z ${GEOMESA_ZOOKEEPER} -u root \
+-p secret -t geomesa.tracks \
+--featurename generated-tracks \
+--translationPoints s3://geotrellis-test/ca/ingest/slight-offsets.json --translationOrigin "0.0,0.0" \
 geotrellis-sample-datasets generated-tracks/
 
-explore:
-	cd ../query-server && ./sbt "project explore" assembly
-	echo "spark-shell --master yarn --deploy-mode client ${SPARK_PARAMS} --jars explore-assembly-0.0.1.jar" > run-explore-shell.sh
+ingest-tracks-translate-gw: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-tracks-translate-gw:
+	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest Generated Tracks Translation" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geowave.Main  ${ASSEMBLY_URI} \
+avro -i gis -z ${GEOWAVE_ZOOKEEPER} -u root \
+-p secret -t geowave.tracks \
+--featurename generated-tracks \
+--temporal \
+--translationPoints s3://geotrellis-test/ca/ingest/slight-offsets.json --translationOrigin "0.0,0.0" \
+geotrellis-sample-datasets generated-tracks/
+
+ingest-tracks-translate: ingest-tracks-translate-gw ingest-tracks-translate-gm
+
+ingest-gdelt-gm: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geomesa ${S3_URI}/jars)
+ingest-gdelt-gm:
+	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOMESA_CLUSTER_ID} "Ingest GDELT GeoMesa" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geomesa.GdeltIngest ${ASSEMBLY_URI} ${GEOMESA_ZOOKEEPER}
+
+ingest-gdelt-gw: ASSEMBLY_URI=$(shell ./stage-assembly.sh ../empirical-data geowave ${S3_URI}/jars)
+ingest-gdelt-gw:
+	@if [ -z "${ASSEMBLY_URI}" ]; then echo "Assembly failed" && exit 1; fi
+	./add-steps.sh ${GEOWAVE_CLUSTER_ID} "Ingest GDELT GeoWave" \
+spark-submit ${SPARK_OPTIONS} --class com.azavea.ingest.geowave.GdeltIngest ${ASSEMBLY_URI} ${GEOWAVE_ZOOKEEPER}
+
+ingest-gdelt: ingest-gdelt-gw ingest-gdelt-gm
+
+../query-server/explore/target/scala-2.11/explore-assembly-0.0.1.jar: $(call rwildcard, $(call rwildcard, server, *.scala) build.sbt, *.scala) ../query-server/explore/build.sbt
+	cd ../query-server/ && ./sbt "project explore" assembly
+
+explore: ../query-server/explore/target/scala-2.11/explore-assembly-0.0.1.jar
+	echo "GM_CLUSTER_ID=${GEOMESA_CLUSTER_ID} GW_CLUSTER_ID=${GEOWAVE_CLUSTER_ID} GM_ZK=${GEOMESA_ZOOKEEPER} GW_ZK=${GEOWAVE_ZOOKEEPER} GM_USER=root GW_USER=root GM_PASS=secret GW_PASS=secret GM_INSTANCE=gis GW_INSTANCE=gis spark-shell --master yarn --deploy-mode client ${SPARK_PARAMS} --jars explore-assembly-0.0.1.jar" > run-explore-shell.sh
 	chmod a+x run-explore-shell.sh
-	scp -i ~/.keys/geotrellis-cluster.pem ../query-server/explore/target/scala-2.11/explore-assembly-0.0.1.jar hadoop@${GEOMESA_ZOOKEEPER}:/home/hadoop
-	scp -i ~/.keys/geotrellis-cluster.pem run-explore-shell.sh hadoop@${GEOMESA_ZOOKEEPER}:/home/hadoop
-	ssh -i ~/.keys/geotrellis-cluster.pem hadoop@${GEOMESA_ZOOKEEPER}
+	scp -i ${EC2_KEY_FILE} ../query-server/explore/target/scala-2.11/explore-assembly-0.0.1.jar hadoop@${GEOMESA_ZOOKEEPER}:/home/hadoop
+	scp -i ${EC2_KEY_FILE} run-explore-shell.sh hadoop@${GEOMESA_ZOOKEEPER}:/home/hadoop
+	ssh -i ${EC2_KEY_FILE} hadoop@${GEOMESA_ZOOKEEPER}
+
+save-metrics:
+	@mkdir -p ../metrics
+	@echo Saving GeoMesa metrics...
+	@aws emr ssh --cluster-id ${GEOMESA_CLUSTER_ID} --key-pair-file "${EC2_KEY_FILE}" \
+		--command "cd /mnt/var/lib/ganglia/rrds && tar czf ~/metrics.tgz j-* && aws s3 cp ~/metrics.tgz ${S3_URI}/metrics/${GEOMESA_CLUSTER_ID}.tgz"
+
+	@echo Save GeoWave metrics...
+	@aws emr ssh --cluster-id ${GEOWAVE_CLUSTER_ID} --key-pair-file "${EC2_KEY_FILE}" \
+		--command "cd /mnt/var/lib/ganglia/rrds && tar czf ~/metrics.tgz j-* && aws s3 cp ~/metrics.tgz ${S3_URI}/metrics/${GEOWAVE_CLUSTER_ID}.tgz"
 
 fetch-metrics:
 	@mkdir -p ../metrics

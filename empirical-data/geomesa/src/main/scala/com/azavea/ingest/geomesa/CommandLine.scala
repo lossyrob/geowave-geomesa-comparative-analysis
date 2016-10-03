@@ -1,6 +1,10 @@
 package com.azavea.ingest.geomesa
 
 import com.azavea.ingest.common._
+import geotrellis.vector._
+import geotrellis.vector.io._
+import geotrellis.vector.io.json._
+import scala.util._
 
 object CommandLine {
 
@@ -35,6 +39,9 @@ object CommandLine {
     cmd("shp")
       .action( (_, conf) => conf.copy(csvOrShp = Ingest.SHP) )
 
+    cmd("avro")
+      .action( (_, conf) => conf.copy(csvOrShp = Ingest.AVRO) )
+
     note("Global options:\n")
 
     opt[String]('i',"instance")
@@ -57,8 +64,30 @@ object CommandLine {
       .action( (s, conf) => { conf.copy(featureName = s) })
       .required
       .text("Name for the SimpleFeatureType")
+    opt[Int]("inputPartitionSize")
+      .action ( (size, conf) => {conf.copy(inputPartitionSize = size)} )
+      .text("Number of inputs per partition")
     help("help").text("Display this help message")
     note("")
+
+    opt[String]("translationPoints")
+      .action( (uri, conf) => conf.copy(translationPoints = {
+                                          val str = Util.readFile(uri)
+                                          Try { str.parseGeoJson[GeometryCollection].points }
+                                            .getOrElse { str.parseGeoJson[JsonFeatureCollection].getAllPoints }
+                                      }))
+      .text("URI of GeoJSON container translation center points")
+
+    opt[String]("period")
+      .action( (s, conf) => conf.copy(period = s) )
+      .text("Period indicator, if not default (default is 'week'). One of: 'day', 'week', 'month', 'year' ")
+
+    opt[String]("translationOrigin")
+      .action( (s, conf) => conf.copy(translationOrigin = {
+                                        val c = s.split(",")
+                                        Some(Point(c(0).toDouble, c(1).toDouble))
+                                      }))
+      .text("Center point of the dataset to be used as translation origin: lat,lng")
 
     arg[String]("<s3 bucket>")
       .action( (s, conf) => conf.copy(s3bucket = s) )
@@ -90,4 +119,3 @@ Note: `date' takes a format string compatible with java.text.SimpleDateFormat.
 """)
   }
 }
-

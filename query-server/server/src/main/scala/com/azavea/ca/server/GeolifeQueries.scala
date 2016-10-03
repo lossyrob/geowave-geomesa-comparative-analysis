@@ -17,47 +17,15 @@ import scala.concurrent.Future
 
 object GeolifeQueries
     extends BaseService
+    with CAQueryUtils
     with CirceSupport
     with AkkaSystem.LoggerExecutor {
 
-  val GM_SFT = "gmtrajectory"
-  val GW_SFT = "gwtrajectory"
+  val gmTableName = "geomesa.geolife"
+  val gmFeatureTypeName = "gmtrajectory"
 
-  // Only use for server-side count aggregations.
-  def geowaveQuerier() =
-    GeoWaveQuerier("geowave.geolife", GW_SFT)
-
-  lazy val geomesaDs = GeoMesaConnection.dataStore("geomesa.geolife")
-  lazy val geowaveDs = GeoWaveConnection.geotoolsDataStore("geowave.geolife")
-
-  def geowaveFeatureSource() = geowaveDs.getFeatureSource(GW_SFT)
-  def geomesaFeatureSource() = geomesaDs.getFeatureSource(GM_SFT)
-
-  def captureGeoWaveQuery(query: Filter): TestResult =
-    TestResult.capture(GeoWaveConnection.clusterId, {
-      geowaveFeatureSource().getFeatures(new Query(GW_SFT, query))
-    })
-
-  def captureGeoMesaQuery(query: Filter, loose: Boolean = false): TestResult = {
-    val q = new Query(GM_SFT, query)
-    q.getHints.put(org.locationtech.geomesa.accumulo.index.QueryHints.LOOSE_BBOX, loose)
-    TestResult.capture(GeoMesaConnection.clusterId, {
-      geomesaFeatureSource().getFeatures(q)
-    })
-  }
-
-  def captureGeoMesaCountQuery(query: Filter, loose: Boolean = false): TestResult = {
-    val q = new Query(GM_SFT, query)
-    q.getHints.put(org.locationtech.geomesa.accumulo.index.QueryHints.EXACT_COUNT, true)
-    q.getHints.put(org.locationtech.geomesa.accumulo.index.QueryHints.LOOSE_BBOX, loose)
-    TestResult.capture(GeoMesaConnection.clusterId, {
-      geomesaFeatureSource().getFeatures(q)
-    })
-  }
-
-  def looseSuffix(opt: Option[String]): String =
-    if(checkIfIsLoose(opt)) "-LOOSE"
-    else ""
+  val gwTableName = "geowave.geolife"
+  val gwFeatureTypeName = "gwtrajectory"
 
   def routes =
     pathPrefix("geolife") {
@@ -65,6 +33,12 @@ object GeolifeQueries
         pathEndOrSingleSlash {
           get {
             complete { Future { "pong" } } }
+        }
+      } ~
+      pathPrefix("reset") {
+        pathEndOrSingleSlash {
+          get {
+            complete { Future { resetDataStores() ; "done" } } }
         }
       } ~
       pathPrefix("spatial-only") {
@@ -88,7 +62,7 @@ object GeolifeQueries
 
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().spatialQueryCount(Beijing.geom.jtsGeom)
+                        geowaveQuerier.spatialQueryCount(Beijing.geom.jtsGeom)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -125,6 +99,60 @@ object GeolifeQueries
             }
           }
         } ~
+        pathPrefix("in-beijing-center-count") {
+          // Query the multipolygon of the city of Beijing, and count results on the server side.
+
+          val queryName = "GEOLIFE-IN-BEIJING-CENTER-COUNT"
+
+          pathEndOrSingleSlash {
+            get {
+              parameters('test ?) { isTestOpt =>
+                val isTest = checkIfIsTest(isTestOpt)
+                complete {
+                  Future {
+                    val query = ECQL.toFilter(Beijing.CQL.inBeijingCenter)
+
+                    val mesa: TestResult = captureGeoMesaCountQuery(query)
+
+                    val wave: TestResult =
+                      TestResult.capture(GeoWaveConnection.clusterId, {
+                        geowaveQuerier.spatialQueryCount(Beijing.centerGeom.jtsGeom)
+                      })
+
+                    val result = RunResult(queryName, mesa, wave, isTest)
+                    DynamoDB.saveResult(result)
+                    result
+                  }
+                }
+              }
+            }
+          }
+        } ~
+        pathPrefix("in-beijing-center-iterate") {
+          // Query the multipolygon of the city of Beijing, and count the results by iterating over them on the client side.
+
+          val queryName = "GEOLIFE-IN-BEIJING-CENTER-ITERATE"
+
+          pathEndOrSingleSlash {
+            get {
+              parameters('test ?) { isTestOpt =>
+                val isTest = checkIfIsTest(isTestOpt)
+                complete {
+                  Future {
+                    val query = ECQL.toFilter(Beijing.CQL.inBeijingCenter)
+
+                    val mesa: TestResult = captureGeoMesaQuery(query)
+                    val wave: TestResult = captureGeoWaveQuery(query)
+
+                    val result = RunResult(queryName, mesa, wave, isTest)
+                    DynamoDB.saveResult(result)
+                    result
+                  }
+                }
+              }
+            }
+          }
+        } ~
         pathPrefix("in-beijing-bbox-count") {
           // Query the bounding box of the city of Beijing, and count results on the server side.
 
@@ -142,7 +170,7 @@ object GeolifeQueries
 
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().spatialQueryCount(Beijing.boundingBoxGeom)
+                        geowaveQuerier.spatialQueryCount(Beijing.boundingBoxGeom)
                       })
 
                     val result = RunResult(queryName + looseSuffix(isLooseOpt), mesa, wave, isTest)
@@ -231,7 +259,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaCountQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().temporalQueryCount(tq, pointOnly = true)
+                        geowaveQuerier.temporalQueryCount(tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -260,7 +288,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().temporalQuery(tq, pointOnly = true)
+                        geowaveQuerier.temporalQuery(tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -289,7 +317,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaCountQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().temporalQueryCount(tq, pointOnly = true)
+                        geowaveQuerier.temporalQueryCount(tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -318,7 +346,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().temporalQuery(tq, pointOnly = true)
+                        geowaveQuerier.temporalQuery(tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -332,8 +360,6 @@ object GeolifeQueries
         }
       } ~
       pathPrefix("spatiotemporal") {
-        // Temporal Only queries.
-
         pathPrefix("in-beijing-aug-2011-iterate") {
           // Query the dataset and return everything in Beijing in August 2011
 
@@ -377,7 +403,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaCountQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().spatialTemporalQueryCount(Beijing.geom.jtsGeom, tq, pointOnly = true)
+                        geowaveQuerier.spatialTemporalQueryCount(Beijing.geom.jtsGeom, tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -428,7 +454,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaCountQuery(query)
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().spatialTemporalQueryCount(Beijing.centerGeom.jtsGeom, tq, pointOnly = true)
+                        geowaveQuerier.spatialTemporalQueryCount(Beijing.centerGeom.jtsGeom, tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName, mesa, wave, isTest)
@@ -479,7 +505,7 @@ object GeolifeQueries
                     val mesa: TestResult = captureGeoMesaCountQuery(query, checkIfIsLoose(isLooseOpt))
                     val wave: TestResult =
                       TestResult.capture(GeoWaveConnection.clusterId, {
-                        geowaveQuerier().spatialTemporalQueryCount(Beijing.centerGeom.envelope.toPolygon.jtsGeom, tq, pointOnly = true)
+                        geowaveQuerier.spatialTemporalQueryCount(Beijing.centerGeom.envelope.toPolygon.jtsGeom, tq, pointOnly = true)
                       })
 
                     val result = RunResult(queryName + looseSuffix(isLooseOpt), mesa, wave, isTest)

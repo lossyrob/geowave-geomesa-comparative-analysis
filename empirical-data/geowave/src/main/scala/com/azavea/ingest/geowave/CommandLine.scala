@@ -14,6 +14,10 @@ import org.geotools.data.simple.SimpleFeatureStore
 import org.geotools.feature.FeatureCollection
 import org.opengis.feature.simple.{SimpleFeature, SimpleFeatureType}
 import org.opengis.filter.Filter
+import geotrellis.vector._
+import geotrellis.vector.io._
+import geotrellis.vector.io.json._
+import scala.util._
 
 import java.util.HashMap
 import scala.collection.JavaConversions._
@@ -54,6 +58,9 @@ object CommandLine {
     cmd("shp")
       .action( (_, conf) => conf.copy(csvOrShp = Ingest.SHP) )
 
+    cmd("avro")
+      .action( (_, conf) => conf.copy(csvOrShp = Ingest.AVRO) )
+
     note("Global options:\n")
 
     opt[String]('i',"instance")
@@ -83,8 +90,45 @@ object CommandLine {
       .action( (_, conf) => { conf.copy(pointOnly = true) })
       .text("Index this as a point-only dataset.")
 
+    opt[Unit]("nostats")
+      .action( (_, conf) => { conf.copy(calcStats = false) })
+      .text("Do no calculate the statistics table (get's around a problem ingesting GDELT).")
+
+    opt[Int]('r', "numPartitions")
+      .action( (v, conf) => { conf.copy(numPartitions = v) })
+      .text("Number of partitions for partitioning strategy")
+    opt[String]('y', "partitionStrategy")
+      .action( (v, conf) => { conf.copy(partitionStrategy = v) })
+      .text("Partition strategy, must have numPartitions > 1, one of: HASH, ROUND_ROBIN")
+    opt[Int]('w', "numSplits")
+      .action( (v, conf) => { conf.copy(numSplits = Some(v)) })
+      .text("Number of splits to set up")
+    opt[Int]("inputPartitionSize")
+      .action ( (size, conf) => {conf.copy(inputPartitionSize = size)} )
+      .text("Number of inputs per partition")
     help("help").text("Display this help message")
     note("")
+
+    opt[String]("translationPoints")
+      .action( (uri, conf) => conf.copy(translationPoints = {
+                                          val str = Util.readFile(uri)
+                                          Try { str.parseGeoJson[GeometryCollection].points }
+                                            .getOrElse { str.parseGeoJson[JsonFeatureCollection].getAllPoints }
+                                        }))
+      .text("URI of GeoJSON container translation center points")
+
+    opt[String]("translationOrigin")
+      .action( (s, conf) => conf.copy(translationOrigin = {
+                                        val c = s.split(",")
+                                        Some(Point(c(0).toDouble, c(1).toDouble))
+                                      }))
+      .text("Center point of the dataset to be used as translation origin: lat,lng")
+
+    opt[String]("period")
+      .action( (s, conf) => conf.copy(period = s) )
+      .text("Period indicator, if not default (default is 'year'). One of: 'day', 'month', 'year' ")
+
+
 
     arg[String]("<s3 bucket>")
       .action( (s, conf) => conf.copy(s3bucket = s) )
