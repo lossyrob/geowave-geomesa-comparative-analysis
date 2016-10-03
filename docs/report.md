@@ -144,7 +144,7 @@ For all deployments, the following versions were used:
 | --------- |:------:|:------:|:---------:|:--------:|:-------:|:-------:|
 | Version   | 2.7.2  | 2.0.0  |   3.4.8   |  1.7.2   |  1.2.6  | 0.9.3-SNAPSHOT  |
 
-For GeoWave, we used a snapshot version based on the code that can be found at commit sha `8760ce2cbc5c8a65c4415de62210303c3c1a9710`
+For GeoWave, we used a snapshot version based on the code that can be found at commit SHA `8760ce2cbc5c8a65c4415de62210303c3c1a9710`
 
 Across all tests, Amazon Web Service (AWS) Elastic Cloud Compute (EC2) instances were used.
 Although the machine counts differed (cluster-size is mentioned where appropriate), the types of machines used were constant and role dependent:
@@ -158,7 +158,7 @@ Although the machine counts differed (cluster-size is mentioned where appropriat
 
 ##### Deployment
 
-A minimal working environment for either GeoWave or GeoMesa (assuming, as we do, an Accumulo backend) includes a number of interdependent, distributed processes through which consistent and predictable behavior is attained. Each of these pieces - i.e. Apache Zookeeper, HDFS, Accumulo - is a complex bit of technology in and of itself. Their interoperation multiplies this complexity and introduces the race conditions one expects of distributed systems. This extreme complexity manifests itself in longer cycles of iteration and more time spent setting up experiments than actually conducting them.
+A minimal working environment for either GeoWave or GeoMesa (assuming, as we do, an Accumulo backend) includes a number of interdependent, distributed processes through which consistent and predictable behavior is attained. Each of these pieces - i.e. Apache Zookeeper, HDFS, Accumulo - is a complex bit of technology in and of itself. Their interoperation multiplies this complexity and introduces the race conditions one expects of distributed systems. This extreme complexity manifests itself in longer cycles of iteration and more time spent setting up experiments than actually conducting testing.
 
 The solution we adopted, after exploring the already existing approaches, was to develop a set of Docker containers which jointly provide the pieces necessary to bring up GeoWave and/or GeoMesa on top of Accumulo. A system of deploying the necessary components, which exists under the name GeoDocker, was improved to the point that we could consistently deploy Accumulo with the necessary components for GeoMesa and GeoWave to identical Hadoop clusters on Amazon Web Service's (AWS) Elastic Map Reduce (EMR). We opted to use the YARN, Zookeeper, and HDFS which is distributed on Amazon EMR to support GeoDocker’s Accumulo processes.
 
@@ -169,47 +169,46 @@ Pictured below is a rough diagram of the deployment most consistently used throu
 The entire infrastructure for actually running queries and collecting timings runs as a server,
 created using the akka-http project. Each endpoint represents a different test case, and timing results are taken from inside of the application to only measure GeoWave and GeoMesa performance.
 Results are saved off to a AWS DynamoDB table for later analysis, and include information about the duration of the query, the timing to the first result of the query,
-as well as the cluster configuraiton information. These query servers run on AWS Elastic Container Service, and all query servers all sit behind an AWS load balancer to allow
+and the cluster configuration information. These query servers run on AWS Elastic Container Service, and all query servers sit behind an AWS load balancer to allow
 for multitenancy testing.
 
 #### Ingest
 
 All data used for benchmarking these systems was loaded through custom Spark-based ingest programs.
-Initial attempts to use the command line tools provided by each of the projects were met with a few notable difficulties
+Initial attempts to use the command line tools provided by each of the projects were met with a few notable difficulties;
 which made writing our own ingest programs the simplest solution. Both teams were consulted about our ingest tooling to
-verify we were performing the ingest correctly. Using our own versions of ingest tooling has the disadvantage that
-ingest timing results cannot be considered in the comparative analysis; however we determined that it was
-the best path forward to provide consistent and successful ingests of our test datasets into both systems with
-exactly the same data was our Spark-based tooling.
+verify their correct operation. Using our own versions of ingest tooling has the disadvantage that
+ingest timing results cannot be considered in the comparative analysis; however we determined that our Spark-based tooling was
+the best path forward to provide consistent and successful ingests of our test datasets into both systems.
 
 See _Appendix B: Details of Ingest Tooling_ for a more complete description of the ingest tooling.
 
-We recorded the size on disk, number of entries, tablet server information and other details for each dataset ingested. These can be found in _Appendix C: Details of Ingested Data_
+We recorded the size on disk, number of entries, tablet server information, and other details for each dataset ingested. These can be found in _Appendix C: Details of Ingested Data_
 
 #### Querying
 
-Queries are generated and submitted by the Query Servers in response to requests from clients. This arrangement was chosen because it allows for quick experimentation and prototyping of different parameters simply by tweaking requests while also ensuring that results are as reproducible as possible (the query server endpoints are written so as to ensure endpoint immutability). The upshot of this is that results generated for this report should be conveniently reproducible and that decisions about which results should be generated, in what order, and how many times are largely in the client’s hands.
+Queries are generated and submitted by the query servers in response to requests from clients. This arrangement was chosen because it allows for quick experimentation and prototyping of different parameters simply by tweaking requests while also ensuring that results are as reproducible as possible. The query server endpoints are written so as to ensure endpoint immutability. Results generated for this report should be conveniently reproducible, and decisions about which results should be generated, in what order, and how many times are largely in the client’s hands.
 
 For the "Serial Queries" tests, the specific queries were run one at a time, so that the only load on the GeoWave or GeoMesa system was a single query. For the "Multitenancy Stress" tests, a framework was used to produce a number of concurrent connections, so that we could test the multitenancy use case by querying the systems in parallel.
 
 One feature we did not compare in our performance tests is the use of secondary indexing.
-A comparison of that feature for both GeoMesa and GeoWave can be found in _Appendix A: Details of GeoMesa and GeoWave features_
+A comparison of that feature for both GeoMesa and GeoWave can be found in _Appendix A: Details of GeoMesa and GeoWave features_.
 
 ### Datasets
 
-We performed performance tests on three different data sets, which are described below.
+We conducted performance tests on three different data sets, which are described below.
 
 #### GeoLife
 
-This GPS trajectory dataset was collected as part of the Microsoft Research Asia Geolife project by 182 users in a period of over five years (from April 2007 to August 2012). A GPS trajectory of this dataset is represented by a sequence of time-stamped points, each of which contains the information of latitude, longitude and altitude. This dataset contains 17,621 trajectories with a total distance of 1,292,951 kilometers and a total duration of 50,176 hours. These trajectories were recorded by different GPS loggers and GPS- phones, and have a variety of sampling rates. 91.5 percent of the trajectories are logged in a dense representation, e.g. every 1~5 seconds or every 5~10 meters per point. Although this dataset is wildly distributed in over 30 cities of China and even in some cities located in the USA and Europe, the majority of the data was created in Beijing, China.
+This GPS trajectory dataset was collected as part of the Microsoft Research Asia Geolife project by 182 users in a period of over five years (from April 2007 to August 2012). A GPS trajectory of this dataset is represented by a sequence of time-stamped points, each of which contains the information of latitude, longitude, and altitude. This dataset contains 17,621 trajectories with a total distance of 1,292,951 kilometers and a total duration of 50,176 hours. These trajectories were recorded by different GPS loggers and GPS phones, and have a variety of sampling rates. 91.5 percent of the trajectories are logged in a dense representation, e.g. every 1~5 seconds or every 5~10 meters per point. Although this dataset is distributed over 30 cities of China and even in some cities located in the USA and Europe, the majority of the data was created in Beijing, China.
 
 Text taken from the GeoLife user guide, found at https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/User20Guide-1.2.pdf
 
 ##### GDELT
 
-GDELT—Global Data on Events, Location and Tone—is a new CAMEO-coded data
-set containing more than 200-million geolocated events with global coverage for 1979 to
-the present. The data are based on news reports from a variety of international news
+GDELT—Global Data on Events, Location and Tone—is a new CAMEO-coded dataset
+ containing more than 200-million geolocated events with global coverage for 1979 to
+the present. The entries are based on news reports from a variety of international news
 sources coded using the Tabari system for events and additional software for location
 and tone. The data is freely available and is updated daily. The GDELT data we have tested against
 contains data up through August 2016.
@@ -219,8 +218,8 @@ Text taken from the ISA 2013 paper introducing GDELT, found at http://data.gdelt
 ##### Synthesized Tracks
 
 We tested against a dataset supplied by a third party that that contain a total of 6.34 million synthesized tracks.
-This set of tracks has a median length of 29.8 km, a mean length of 38.82 km and each track contains an average of 491.45 points.
-There is approx. 35.88 GB of data compressed and stored as around 730 avro encoded files.
+This set of tracks has a median length of 29.8 km, a mean length of 38.82 km, and each track contains an average of 491.45 points.
+There is approximately 35.88 GB of data compressed and stored as 729 Avro encoded files.
 The tracks are generated through a statistical process using Global Open Street Map data and Global Landscan data as inputs.
 The dataset is available at `s3://geotrellis-sample-datasets/generated-tracks/`
 
@@ -241,25 +240,25 @@ A complete analysis of the performance test can be found in the following append
 - _Appendix E: Details of Multitenancy Stress Tests_
 - _Appendix F: Details of Performance Test Conclusions_
 
-This section will summarize our findings from analyzing data from the "Serial Queries" and "Multitenancy Stress" tests.
+This section will summarize our findings from the "Serial Queries" and "Multitenancy Stress" tests.
 
-A general conclusion that we reached was that differences in the query planning approaches can explain a variety of the performance diffferences we
-were seeing. GeoWave uses the very sophisticated algorithm to compute its query plans, and GeoMesa uses faster (but less thorough) algorithm.
-The net effect is that GeoWave tends spend more time on query planning, but with greater selectivity (fewer false-positives which in the ranges which must later be filtered out).
+A general conclusion reached was that differences in the query planning approaches can explain a variety of the performance differences seen.
+GeoWave uses the a very sophisticated algorithm to compute its query plans, and GeoMesa uses a faster (but less thorough) algorithm.
+The net effect is that GeoWave tends to spend more time on query planning, but with greater selectivity (fewer false positives which must later be filtered).
 
 There are three major results that we believe can be explained by this difference in query planning algorithms:
 - GeoMesa tends to perform better as the result set size of queries increases.
-- GeoMesa tends to perform worse as the temporal winow of queries increases. This result can be mitigated by the configuration of the periodicity of the GeoMesa index.
+- GeoMesa tends to perform worse as the temporal window of queries increases. This result can be mitigated by the configuration of the periodicity of the GeoMesa index.
 - GeoWave tends to perform much better in multitenancy situations.
 
 Details on how the query planning causes these results can be found in _Appendix F: Details of Performance Test Conclusions_.
 
-One final major conclusion that we found is that GeoWave performs better on the GDELT dataset if a hashing partition
-strategy is used with four partitions. For analogous use cases, we recommend using the partitioning feature for GeoWave.
+One notable result found is that GeoWave performs better on the GDELT dataset if a hashing partition
+strategy is used with four partitions. For analogous use cases, we recommend using the partitioning feature of GeoWave.
 
 ## Conclusions
 
-Our comparative analysis between the GeoWave and GeoMesa projects conclude that both projects are well executed, advanced projects for
+Our comparative analysis between the GeoWave and GeoMesa projects concluded both projects are well executed, advanced projects for
 dealing with big geospatial data. Both projects should be considered when a big geospatial data solution is required. We hope
 this document allows potential users to make the best choice when deciding between which project to use.
 
